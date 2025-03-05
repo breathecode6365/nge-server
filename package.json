@@ -3,14 +3,17 @@
   "version": "1.0.0",
   "main": "api/index.js",
   "scripts": {
+    "start": "nodemon api/index.js",
     "dev": "vercel dev",
     "build": "vercel build",
     "deploy": "vercel deploy"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
+    "expo-server-sdk": "^3.14.0",
     "express": "^4.21.2",
-    "firebase-admin": "^13.1.0"
+    "firebase-admin": "^13.1.0",
+    "nodemon": "^3.1.9"
   },
   "devDependencies": {
     "vercel": "^31.0.0"

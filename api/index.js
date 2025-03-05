@@ -1,51 +1,103 @@
-require("dotenv").config(); // Load environment variables
-const admin = require("firebase-admin");
+require("dotenv").config();
 const express = require("express");
+const { Expo } = require("expo-server-sdk");
 
 const app = express();
 app.use(express.json());
 
-// Initialize Firebase Admin using environment variables
-admin.initializeApp({
-  credential: admin.credential.cert({
-    project_id: process.env.FIREBASE_PROJECT_ID,
-    private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"), // Fix newline issue
-    client_email: process.env.FIREBASE_CLIENT_EMAIL,
-  }),
+const expo = new Expo();
+
+// ✅ In-memory storage for Expo push tokens
+let expoPushTokens = [];
+
+// ✅ Store Expo Push Tokens
+app.post("/store-expo-token", (req, res) => {
+  console.log("📥 Received request to store Expo token");
+
+  const { token } = req.body;
+  if (!token) {
+    console.error("❌ No token provided in request!");
+    return res.status(400).json({ error: "Token is required" });
+  }
+
+  if (!Expo.isExpoPushToken(token)) {
+    console.error("❌ Invalid Expo push token received:", token);
+    return res.status(400).json({ error: "Invalid Expo Push Token" });
+  }
+
+  if (!expoPushTokens.includes(token)) {
+    expoPushTokens.push(token);
+    console.log("✅ New Expo push token stored:", token);
+  } else {
+    console.log("ℹ️ Token already exists, skipping:", token);
+  }
+
+  res.json({ success: true, message: "Expo Push Token stored successfully" });
 });
 
-const messaging = admin.messaging();
+// ✅ Send Push Notification to All Stored Tokens
+app.post("/send-notification", async (req, res) => {
+  console.log("📤 Received request to send notification");
 
+  const { title, body, type } = req.body; // "warning" | "success" | "info"
+
+  if (!title || !body) {
+    console.error("❌ Missing title or body in request");
+    return res.status(400).json({ error: "Title and body are required" });
+  }
+
+  if (expoPushTokens.length === 0) {
+    console.warn("⚠️ No Expo push tokens available.");
+    return res.json({ success: false, message: "No push tokens stored" });
+  }
+
+  console.log("📨 Sending notifications with type:", type);
+
+  let channelId = "default";
+  if (type === "warning") channelId = "warning";
+  if (type === "success") channelId = "success";
+
+  let messages = expoPushTokens.map((token) => ({
+    to: token,
+    sound: "default",
+    title: title,
+    body: body,
+    data: { type },
+    channelId, // Assigning the channel
+  }));
+
+  try {
+    let chunks = expo.chunkPushNotifications(messages);
+    let tickets = [];
+
+    for (let chunk of chunks) {
+      console.log("📦 Sending notification chunk:", chunk);
+      let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+      tickets.push(...ticketChunk);
+      console.log("✅ Ticket response:", ticketChunk);
+    }
+
+    console.log("📩 All notifications sent successfully.");
+    res.json({ success: true, message: "Notifications sent successfully" });
+  } catch (error) {
+    console.error("❌ Error sending notifications:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+// ✅ Check stored tokens
+app.get("/tokens", (req, res) => {
+  console.log("📜 Stored Expo tokens:", expoPushTokens);
+  res.json({ tokens: expoPushTokens });
+});
+
+// ✅ Root route
 app.get("/", (req, res) => {
-  res.send("Hello World");
+  console.log("👋 Hello from the Expo Notification Server!");
+  res.send("Hello from Expo Notification Server!");
 });
 
-app.post("/notify", async (req, res) => {
-  const message = {
-    notification: {
-      title: req.body.title || "New Notification",
-      body: req.body.body || "This is a notification",
-    },
-    topic: "all",
-  };
-
-  try {
-    await messaging.send(message);
-    res.json({ success: true, message: "Notification sent successfully" });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.post("/subscribe", async (req, res) => {
-  const { token, topic } = req.body;
-
-  try {
-    await messaging.subscribeToTopic(token, topic);
-    res.json({ success: true, message: `Subscribed to topic: ${topic}` });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.listen(3000, "0.0.0.0", () => console.log("Server running on port 3000"));
+// ✅ Start Server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
