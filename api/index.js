@@ -43,12 +43,12 @@ app.post("/send-notification", async (req, res) => {
 
   if (!title || !body) {
     console.error("❌ Missing title or body in request");
-    return res.status(400).json({ error: "Title and body are required" });
+    return res.status(400).send("Title and body are required");
   }
 
   if (expoPushTokens.length === 0) {
     console.warn("⚠️ No Expo push tokens available.");
-    return res.json({ success: false, message: "No push tokens stored" });
+    return res.send("No Expo push tokens available");
   }
 
   console.log("📨 Sending notifications with type:", type);
@@ -78,13 +78,12 @@ app.post("/send-notification", async (req, res) => {
     }
 
     console.log("📩 All notifications sent successfully.");
-    res.json({ success: true, message: "Notifications sent successfully" });
+    return res.status(200).send("All notifications sent successfully");
   } catch (error) {
     console.error("❌ Error sending notifications:", error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).send("Error sending notifications");
   }
 });
-
 
 // ✅ Check stored tokens
 app.get("/tokens", (req, res) => {
