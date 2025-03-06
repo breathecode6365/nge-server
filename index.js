@@ -51,10 +51,14 @@ app.post("/store-expo-token", (req, res) => {
 });
 
 // ✅ Send Push Notification to All Stored Tokens
-app.post("/send-notification", async (req, res) => {
+app.get("/send-notification", async (req, res) => {
   console.log("📤 Received request to send notification");
 
-  const { title, body, type } = req.body;
+  // const { title, body, type } = req.body;
+  // take the title, body and type from the request params
+  const title = req.query.title;
+  const body = req.query.body;
+  const type = req.query.type;
   if (!title || !body) {
     console.error("❌ Missing title or body in request");
     return res.status(400).send("Title and body are required");
